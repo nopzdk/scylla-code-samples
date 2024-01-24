@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   scylla-manager:
-    image: scylladb/scylla-manager:2.6.3
+    image: scylladb/scylla-manager:3.2.5
     networks:
       public:
     depends_on:
@@ -49,8 +49,8 @@ services:
     ports:
       - "9001:9000"
     environment:
-      MINIO_ACCESS_KEY: minio
-      MINIO_SECRET_KEY: minio123
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
     command: server /data
 
 volumes:
