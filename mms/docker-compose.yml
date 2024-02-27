@@ -6,7 +6,7 @@ services:
     container_name: scylla-node1
     image: scylladb/scylla:5.4.3
     restart: always
-    command: --seeds=scylla-node1 --smp 1 --memory 1G --overprovisioned 1
+    command: --seeds=scylla-node1 --smp 1 --memory 750M --overprovisioned 1
     volumes:
       - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
       - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
@@ -18,7 +18,7 @@ services:
     container_name: scylla-node2
     image: scylladb/scylla:5.4.3
     restart: always
-    command: --seeds=scylla-node1 --smp 1 --memory 1G --overprovisioned 1
+    command: --seeds=scylla-node1 --smp 1 --memory 750M --overprovisioned 1
     volumes:
       - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
       - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
@@ -29,7 +29,7 @@ services:
     container_name: scylla-node3
     image: scylladb/scylla:5.4.3
     restart: always
-    command: --seeds=scylla-node1 --smp 1 --memory 1G --overprovisioned 1
+    command: --seeds=scylla-node1 --smp 1 --memory 750M --overprovisioned 1
     volumes:
       - "./scylla/scylla.yaml:/etc/scylla/scylla.yaml"
       - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"

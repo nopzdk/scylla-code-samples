@@ -6,7 +6,7 @@ services:
     container_name: scylla-node7
     image: scylladb/scylla:5.4.3
     restart: always
-    command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 1G --overprovisioned 1
+    command: --seeds=scylla-node1,scylla-node2 --smp 1 --memory 750M --overprovisioned 1
     volumes:
       - "./scylla/scylla-replace-node.yaml:/etc/scylla/scylla.yaml"
       - "./scylla/cassandra-rackdc.properties.dc1:/etc/scylla/cassandra-rackdc.properties"
