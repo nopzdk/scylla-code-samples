@@ -19,6 +19,13 @@ dependencies {
     // Use JUnit Jupiter for testing.
     testImplementation libs.junit.jupiter
 
+    // Testcontainers dependencies
+    testImplementation 'org.testcontainers:scylladb:1.20.5'
+    testImplementation 'com.scylladb:java-driver-core:4.18.1.0'
+
+    // Logback dependency
+    implementation 'ch.qos.logback:logback-classic:1.4.11'
+
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // This dependency is used by the application.
@@ -40,4 +47,11 @@ application {
 tasks.named('test') {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+        exceptionFormat = 'full' 
+        showCauses = true
+    }
 }
