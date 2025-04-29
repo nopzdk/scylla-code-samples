@@ -13,3 +13,5 @@ buildNumber.properties
 *.csv
 presto/resources/etc/node.properties
 presto/.docker
+
+!java-testcontainers/gradle/wrapper/*
