@@ -1,13 +1,14 @@
 use crate::db::model::DbNote;
 
-use futures::stream::StreamExt;
-use scylla::load_balancing::DefaultPolicy;
-use scylla::prepared_statement::PreparedStatement;
+use futures::TryStreamExt;
+use scylla::client::execution_profile::ExecutionProfile;
+use scylla::client::session::Session;
+use scylla::client::session_builder::SessionBuilder;
+use scylla::client::Compression;
+use scylla::errors::ExecutionError;
+use scylla::policies::load_balancing::DefaultPolicy;
+use scylla::statement::prepared::PreparedStatement;
 use scylla::statement::Consistency;
-use scylla::transport::errors::QueryError;
-use scylla::transport::ExecutionProfile;
-use scylla::transport::Compression;
-use scylla::{Session, SessionBuilder};
 use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
@@ -45,7 +46,7 @@ impl ScyllaDbService {
 
         let default_policy = DefaultPolicy::builder()
             .prefer_datacenter(dc.to_string())
-//            .prefer_rack("rack1".to_string())
+            //            .prefer_rack("rack1".to_string())
             .token_aware(true)
             .permit_dc_failover(false)
             .build();
@@ -59,6 +60,7 @@ impl ScyllaDbService {
             .known_node(host.clone())
             .default_execution_profile_handle(handle)
             .compression(Some(Compression::Lz4))
+            .schema_agreement_timeout(Duration::from_secs(10))
             .build()
             .await
             .expect("Error Connecting to ScyllaDB");
@@ -81,17 +83,13 @@ impl ScyllaDbService {
             if !query.starts_with("--") && query.len() > 1 {
                 info!("Running Query {}", query);
                 session
-                    .query(query, &[])
+                    .query_unpaged(query, &[])
                     .await
                     .expect("Error creating schema!");
             }
         }
 
-        if session
-            .await_timed_schema_agreement(Duration::from_secs(10))
-            .await
-            .expect("Error Awaiting Schema Creation")
-        {
+        if session.await_schema_agreement().await.is_ok() {
             info!("Schema Created!");
         } else {
             panic!("Timed schema is NOT in agreement");
@@ -119,14 +117,14 @@ impl ScyllaDbService {
     pub async fn delete_note(
         &self,
         id: &str,
-    ) -> Result<Option<QueryError>, Box<dyn std::error::Error + Sync + Send>> {
+    ) -> Result<Option<ExecutionError>, Box<dyn std::error::Error + Sync + Send>> {
         return self.delete_note_int(id).await;
     }
 
     async fn delete_note_int(
         &self,
         id: &str,
-    ) -> Result<Option<QueryError>, Box<dyn std::error::Error + Sync + Send>> {
+    ) -> Result<Option<ExecutionError>, Box<dyn std::error::Error + Sync + Send>> {
         let now = Instant::now();
         info!("ScyllaDbService: delete_note: {} ", id);
 
@@ -135,7 +133,7 @@ impl ScyllaDbService {
         let q = DELETE_ONE_QUERY;
 
         let session = self.db_session.clone();
-        let result = session.query(q, (uuid,)).await;
+        let result = session.query_unpaged(q, (uuid,)).await;
 
         let elapsed = now.elapsed();
         info!(
@@ -154,17 +152,16 @@ impl ScyllaDbService {
         let now = Instant::now();
         info!("ScyllaDbService: get_notes: ");
 
-        let mut ret = vec![];
-
         let q = GET_ALL_QUERY;
 
         let session = self.db_session.clone();
-        let mut result = session.query_iter(q, ()).await?.into_typed::<DbNote>();
         //TODO  this should be implemented by paging towards REST, not by creating this huge response
-        while let Some(r) = result.next().await {
-            let note = r.unwrap();
-            ret.push(note);
-        }
+        let ret = session
+            .query_iter(q, ())
+            .await?
+            .rows_stream::<DbNote>()?
+            .try_collect::<Vec<DbNote>>()
+            .await?;
 
         let elapsed = now.elapsed();
         info!(
@@ -191,21 +188,16 @@ impl ScyllaDbService {
         info!("ScyllaDbService: get_note: {} ", id);
 
         let uuid = Uuid::parse_str(id)?;
-        let mut ret = vec![];
 
         let q = GET_ONE_QUERY;
 
         let session = self.db_session.clone();
-        let result = session.query(q, (uuid,)).await?;
+        let result = session.query_unpaged(q, (uuid,)).await?;
 
-        if let Some(rows) = result.rows {
-            for r in rows {
-                let node = r.into_typed::<DbNote>()?;
-                // let simple = r.into_typed::<DbNoteSimple>()?;
-                // node = DbNote::from_simple(simple);
-                ret.push(node);
-            }
-        }
+        let ret = result
+            .into_rows_result()?
+            .rows::<DbNote>()?
+            .collect::<Result<Vec<_>, _>>()?;
 
         let elapsed = now.elapsed();
         info!(
@@ -234,7 +226,7 @@ impl ScyllaDbService {
         handlers.push(tokio::task::spawn(async move {
             debug!("save_nodes: Running query for node {}", entry.topic);
             let result = session
-                .execute(&prepared, (entry.id, entry.content, entry.topic))
+                .execute_unpaged(&prepared, (entry.id, entry.content, entry.topic))
                 .await;
 
             let _permit = permit;
